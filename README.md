@@ -85,6 +85,21 @@ update 2021-11-14
 нужно суммировать ее десятичные цифры,
 и после от этой суммы взять остаток от деления на 10.
 
+```
+    uint zero = QChar('0').unicode();
+
+    uint sum = 0;
+    for (const QChar& sy: list_remember_queue)
+        sum += sy.unicode() - zero;
+
+    QString s = QString::number(sum);
+    sum = 0;
+    for (const QChar& sy: s)
+        sum += sy.unicode() - zero;
+
+    return QChar( (sum % 10) + zero );
+```
+
 Формула существенна проста, но требует дополнительной памяти
 для вычисления, и приучает мозг не терять запомненное
 при различных обработках запомненных данных.
