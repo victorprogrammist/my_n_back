@@ -51,11 +51,19 @@ MainWindow::MainWindow(QWidget *parent) :
         r1.height()/2 - sz.height()/2,
         sz.width(), sz.height());
 
+    ui->tabWidget->setCurrentWidget(ui->tab_main);
+
     initDatabase();
+
+    m_current_level = 2;
+    m_current_minCount = 4;
+
+    ui->spbox_level->setValue(m_current_level);
+    ui->spbox_minCount->setValue(m_current_minCount);
     initTableResults();
 
     state_play = true;
-    on_bt_stop_clicked();
+    clicked_bt_stop_clicked();
 
     ui->lb_symb->setText("");
     ui->lb_info->setText("");
@@ -66,27 +74,53 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->bt_exit, &QPushButton::clicked, fnQuit);
 
     new QShortcut(QKeySequence(Qt::Key_Backspace), this,
-        [this] { on_bt_stop_clicked(); });
+        this, &MainWindow::clicked_bt_stop_clicked);
+    connect(ui->bt_stop, &QPushButton::clicked,
+        this, &MainWindow::clicked_bt_stop_clicked);
 
     new QShortcut(QKeySequence(Qt::Key_Space), this,
-        [this] { on_bt_start_clicked(); });
+        this, &MainWindow::clicked_bt_start_clicked);
+    connect(ui->bt_start, &QPushButton::clicked,
+        this, &MainWindow::clicked_bt_start_clicked);
 
     new QShortcut(QKeySequence(Qt::Key_PageUp), this,
-        [this] { on_bt_increase_clicked(); });
+        this, &MainWindow::clicked_bt_increase_clicked);
+    connect(ui->bt_increase, &QPushButton::clicked,
+        this, &MainWindow::clicked_bt_increase_clicked);
 
     new QShortcut(QKeySequence(Qt::Key_Enter), this,
-        [this] { on_bt_continue_clicked(); });
-
+        this, &MainWindow::clicked_bt_continue_after_error_clicked);
     new QShortcut(QKeySequence(Qt::Key_Return), this,
-        [this] { on_bt_continue_clicked(); });
+        this, &MainWindow::clicked_bt_continue_after_error_clicked);
+    connect(ui->bt_continue, &QPushButton::clicked,
+        this, &MainWindow::clicked_bt_continue_after_error_clicked);
 
     connect(ui->spbox_level, QOverload<int>::of(&QSpinBox::valueChanged),
     [this](uint level) { m_current_level = level; setQueryResults(); });
+
+    connect(ui->spbox_minCount, QOverload<int>::of(&QSpinBox::valueChanged),
+    [this](uint cnt) { m_current_minCount = cnt; setQueryResults(); });
+
+    QTimer* tm = new QTimer(this);
+    connect(tm, &QTimer::timeout, this, &MainWindow::timeout_waiting_keypress);
+    tm->start(100);
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+void MainWindow::timeout_waiting_keypress() {
+
+    if (!state_play || state_error)
+        return;
+
+    QDateTime dt = QDateTime::currentDateTimeUtc();
+    qint64 offs = dt_start_waiting_keyPress.msecsTo(dt);
+
+    if (offs >= 20000)
+        fix_pressed_key(0);
 }
 
 void MainWindow::recalc_probability() {
@@ -107,14 +141,11 @@ void MainWindow::recalc_probability() {
 
 void MainWindow::show_stat_info() {
 
-    if (map_stat_levels.empty()) {
-        ui->lb_info->setText("---");
-        return;
-    }
-
-    vector<double> list_rew;
-
     QStringList list_info;
+
+    list_info.append("CURRENT_LEVEL: "+QString::number(list_remember_queue.size()));
+    list_info.append("");
+
     for (auto& pr : map_stat_levels) {
         uint szQu = pr.first;
         LevCntr& m = pr.second;
@@ -124,10 +155,9 @@ void MainWindow::show_stat_info() {
                 " "+QString::number(m.c_errors)+
                 "/"+QString::number(m.c_passed_steps)+
                 "/"+QString::number(m.c_skipped_steps)+
-                " rew: "+QString::number(m.probability, 'f', 4);
+                " reward: "+QString::number(m.probability, 'f', 4);
 
         list_info.append(s);
-        list_rew.insert(list_rew.begin(), m.probability);
     }
 
     QString info = list_info.join("\n");
@@ -165,12 +195,14 @@ void MainWindow::show_new_key_after_delay() {
     show_stat_info();
 }
 
-void MainWindow::make_new_random_key() {
+void MainWindow::make_new_random_symbol() {
 
     uint index_new_symbol = rand() % abc().size();
     QChar sy = abc().at(index_new_symbol);
     list_remember_queue.push_back(sy);
-    ++count_generated_steps;
+    ++count_generated_keys;
+
+    dt_start_waiting_keyPress = QDateTime::currentDateTimeUtc();
 
     QTimer::singleShot(200, this, SLOT(show_new_key_after_delay()));
 }
@@ -182,13 +214,16 @@ void MainWindow::fix_pressed_key(QChar sy) {
     uint szQu = list_remember_queue.size();
 
     current_symbol = list_remember_queue.front();
-    state_error = pressed_symbol != current_symbol;
+
+    state_error =
+        pressed_symbol != current_symbol
+        || pressed_symbol.unicode() == 0;
 
     state_skipping = false;
-    if (!state_error)
-        state_skipping = steps_for_skipping.count(index_current_step);
 
-    steps_for_skipping.erase(index_current_step);
+    if (!state_error)
+        if (index_pressed_true_keys < count_pressed_for_skip)
+            state_skipping = true;
 
     file_log(
              path_file_log(),
@@ -213,14 +248,13 @@ void MainWindow::fix_pressed_key(QChar sy) {
     insert_step();
 
     if (!state_error) {
-        ++index_current_step;
+        ++index_pressed_true_keys;
         list_remember_queue.erase(list_remember_queue.begin());
-        make_new_random_key();
+        make_new_random_symbol();
         return;
     }
 
-    for (uint ii = 0; ii < szQu; ++ii)
-        steps_for_skipping.insert(index_current_step + ii);
+    count_pressed_for_skip = index_pressed_true_keys + szQu;
 
     QString msg_symbols = "";
     for (QChar sy: list_remember_queue)
@@ -252,7 +286,7 @@ void MainWindow::keyPressEvent(QKeyEvent* event) {
     fix_pressed_key(sy);
 }
 
-void MainWindow::on_bt_start_clicked()
+void MainWindow::clicked_bt_start_clicked()
 {
     if (state_play)
         return;
@@ -263,8 +297,9 @@ void MainWindow::on_bt_start_clicked()
     ui->bt_continue->setEnabled(false);
     ui->bt_exit->setEnabled(false);
 
-    count_generated_steps = 0;
-    index_current_step = 0;
+    count_generated_keys = 0;
+    index_pressed_true_keys = 0;
+    count_pressed_for_skip = 0;
 
     list_remember_queue.clear();
     state_play = true;
@@ -274,13 +309,13 @@ void MainWindow::on_bt_start_clicked()
     map_stat_levels.clear();
 
     srand(time(NULL));
-    make_new_random_key();
+    make_new_random_symbol();
 
     file_log(path_file_log(), "=== START ===");    
     insert_start();
 }
 
-void MainWindow::on_bt_stop_clicked()
+void MainWindow::clicked_bt_stop_clicked()
 {
     if (!state_play)
         return;
@@ -297,13 +332,13 @@ void MainWindow::on_bt_stop_clicked()
     ui->lb_symb->setStyleSheet("");
 }
 
-void MainWindow::on_bt_increase_clicked()
+void MainWindow::clicked_bt_increase_clicked()
 {
     if (state_play && !state_error)
-        make_new_random_key();
+        make_new_random_symbol();
 }
 
-void MainWindow::on_bt_continue_clicked()
+void MainWindow::clicked_bt_continue_after_error_clicked()
 {
     if (!state_play || !state_error)
         return;
@@ -313,5 +348,6 @@ void MainWindow::on_bt_continue_clicked()
     ui->bt_increase->setEnabled(true);
     ui->bt_continue->setEnabled(false);
     state_error = false;
+    dt_start_waiting_keyPress = QDateTime::currentDateTimeUtc();
 }
 

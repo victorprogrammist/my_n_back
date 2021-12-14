@@ -7,11 +7,11 @@
     <x>0</x>
     <y>0</y>
     <width>617</width>
-    <height>468</height>
+    <height>548</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>My-N-Back</string>
   </property>
   <widget class="QWidget" name="centralWidget">
    <layout class="QVBoxLayout" name="verticalLayout">
@@ -20,7 +20,7 @@
       <property name="currentIndex">
        <number>0</number>
       </property>
-      <widget class="QWidget" name="tab_1">
+      <widget class="QWidget" name="tab_main">
        <attribute name="title">
         <string>Main</string>
        </attribute>
@@ -144,7 +144,7 @@
             <widget class="QLabel" name="lb_info">
              <property name="font">
               <font>
-               <pointsize>21</pointsize>
+               <pointsize>20</pointsize>
               </font>
              </property>
              <property name="text">
@@ -173,7 +173,7 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="tab_2">
+      <widget class="QWidget" name="tab_results">
        <attribute name="title">
         <string>Results</string>
        </attribute>
@@ -191,6 +191,9 @@
             <property name="text">
              <string>Level:</string>
             </property>
+            <property name="alignment">
+             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+            </property>
            </widget>
           </item>
           <item>
@@ -202,14 +205,31 @@
              </size>
             </property>
             <property name="minimum">
-             <number>1</number>
+             <number>0</number>
             </property>
            </widget>
           </item>
           <item>
            <widget class="QLabel" name="label_2">
             <property name="text">
-             <string>TextLabel</string>
+             <string>Min.count:</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="spbox_minCount">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_3">
+            <property name="text">
+             <string/>
             </property>
            </widget>
           </item>
@@ -217,6 +237,29 @@
         </item>
         <item>
          <widget class="QTableView" name="tb_results"/>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tab_about">
+       <attribute name="title">
+        <string>About</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_5">
+        <item>
+         <widget class="QLabel" name="label_4">
+          <property name="text">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Author: Telnov Viktor&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;E-mail: telnov-vs@yandex.ru&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Site: https://github.com/victorprogrammist/my_n_back&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+          <property name="margin">
+           <number>50</number>
+          </property>
+         </widget>
         </item>
        </layout>
       </widget>

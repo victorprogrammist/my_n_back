@@ -13,9 +13,14 @@ QString textQueryResuls() {
 
     "select"
     "  dateTime(t1.dateTime, 'localtime') as dateTime,"
-    "  t2.countPassedSteps + t2.countSkippedSteps as countSteps,"
+    "  t2.countPassedSteps as stepsForRew,"
     "  t2.countErrors,"
-    "  round(t2.probability, 3) as probability"
+    "  round(t2.probability, 3) as rew,"
+    "  round("
+    "   1. - "
+    "   cast(t2.countErrors as double) /"
+    "   cast(t2.countPassedSteps as double)"
+    "  , 2) as probability"
 
     " from ("
 
@@ -29,7 +34,9 @@ QString textQueryResuls() {
     "  on t1.id = t2.idStart"
 
     " where"
-    "  t2.queueLength = :level"
+    "  (:level = 0 or t2.queueLength = :level)"
+    "  and "
+    "  t2.countPassedSteps >= :minCount"
 
     " group by"
     "  t1.id"
@@ -37,7 +44,7 @@ QString textQueryResuls() {
     "  inner join STARTS as t1 on t1.id = t0.idStart"
     "  inner join STEPS as t2 on t2.id = t0.idLastStep"
 
-    " order by t1.dateTime";
+    " order by t1.dateTime desc";
 }
 
 void MainWindow::setQueryResults() {
@@ -50,6 +57,7 @@ void MainWindow::setQueryResults() {
     }
 
     qu.bindValue(":level", m_current_level);
+    qu.bindValue(":minCount", m_current_minCount);
     qu.exec();
 
     model_results.setQuery(qu);

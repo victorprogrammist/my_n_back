@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QDateTime>
 #include <QSqlQueryModel>
 #include <QSqlQuery>
 
@@ -27,7 +28,7 @@ public:
     void fix_pressed_key(QChar sy);
     void recalc_probability();
     void show_stat_info();
-    void make_new_random_key();
+    void make_new_random_symbol();
 
     void initDatabase();
     void insert_start();
@@ -39,11 +40,12 @@ public:
     QChar current_symbol;
     QChar pressed_symbol;
     uint cntr_wait_for_hidding = 0;
+    QDateTime dt_start_waiting_keyPress;
 
     vector<QChar> list_remember_queue;
-    set<uint> steps_for_skipping;
-    uint index_current_step = 0;
-    uint count_generated_steps = 0;
+    uint index_pressed_true_keys = 0;
+    uint count_generated_keys = 0;
+    uint count_pressed_for_skip = 0; // because it was showed
 
     uint id_current_game = 0;
 
@@ -61,19 +63,21 @@ public:
 
     QSqlQueryModel model_results;
     QSqlQuery query_results;
-    uint m_current_level = 1;
+    uint m_current_level;
+    uint m_current_minCount;
 
 private slots:
-    void on_bt_start_clicked();
+    void clicked_bt_start_clicked();
 
     void hide_new_key_after_delay();
     void show_new_key_after_delay();
+    void timeout_waiting_keypress();
 
-    void on_bt_stop_clicked();
+    void clicked_bt_stop_clicked();
 
-    void on_bt_increase_clicked();
+    void clicked_bt_increase_clicked();
 
-    void on_bt_continue_clicked();
+    void clicked_bt_continue_after_error_clicked();
 
 private:
     Ui::MainWindow *ui;
