@@ -26,17 +26,21 @@ public:
 
     void keyPressEvent(QKeyEvent* event) override;
     void fix_pressed_key(QChar sy);
-    void recalc_probability();
+    void recalc_score();
     void show_stat_info();
     void make_new_random_symbol();
 
     void initDatabase();
     void insert_start();
-    void insert_step();
+    void insert_step(uint asTimeMarker);
+
+    const QString& current_abc() const;
+    QChar get_current_symbol() const;
 
     bool state_play = false;
     bool state_error = false;
     bool state_skipping = false;
+    uint state_game_type = 0;
     QChar current_symbol;
     QChar pressed_symbol;
     uint cntr_wait_for_hidding = 0;
@@ -53,7 +57,7 @@ public:
         uint c_passed_steps = 0;
         uint c_skipped_steps = 0; // символы, которые были показаны после ошибки - не засчитываются
         uint c_errors = 0;
-        double probability = 0;
+        double score = 0;
     };
 
     map<uint,LevCntr> map_stat_levels;
@@ -72,6 +76,8 @@ private slots:
     void hide_new_key_after_delay();
     void show_new_key_after_delay();
     void timeout_waiting_keypress();
+    void change_game_type();
+    void after_change_rb_game_type();
 
     void clicked_bt_stop_clicked();
 

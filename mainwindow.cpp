@@ -2,6 +2,8 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
+#include <QDebug>
+
 #include <QKeyEvent>
 #include <QTimer>
 #include <QShortcut>
@@ -18,10 +20,10 @@ QString app_path();
 void file_log(const QString& fn, const QString& s);
 
 static QString path_file_log() {
-    return pathAppData()+"/log.log";
+    return pathAppData()+"/log-2.log";
 }
 
-static const QString& abc() {
+static const QString& abc_english() {
     static QString r =
             "abcdefghijklmnopqrstuvwxyz"
             "0123456789"
@@ -30,8 +32,16 @@ static const QString& abc() {
     return r;
 }
 
-static const QString& _abc() {
-    static QString r = "abcdefghijklmnopqrstuvwxyz";
+static const QString& abc_russian() {
+    static QString r =
+            "йцукенгшщзхъфывапролджэячсмитьбю."
+            "0123456789-="
+            ;
+    return r;
+}
+
+static const QString& abc_numbers() {
+    static QString r = "0123456789";
     return r;
 }
 
@@ -60,6 +70,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->spbox_level->setValue(m_current_level);
     ui->spbox_minCount->setValue(m_current_minCount);
+
+    state_game_type = 1;
+    ui->rb_english->setChecked(true);
     initTableResults();
 
     state_play = true;
@@ -95,6 +108,9 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->bt_continue, &QPushButton::clicked,
         this, &MainWindow::clicked_bt_continue_after_error_clicked);
 
+    new QShortcut(QKeySequence(Qt::Key_Tab), this,
+        this, &MainWindow::change_game_type);
+
     connect(ui->spbox_level, QOverload<int>::of(&QSpinBox::valueChanged),
     [this](uint level) { m_current_level = level; setQueryResults(); });
 
@@ -104,6 +120,13 @@ MainWindow::MainWindow(QWidget *parent) :
     QTimer* tm = new QTimer(this);
     connect(tm, &QTimer::timeout, this, &MainWindow::timeout_waiting_keypress);
     tm->start(100);
+
+    connect(ui->rb_english, &QPushButton::clicked,
+        [this] { after_change_rb_game_type(); });
+    connect(ui->rb_russian, &QPushButton::clicked,
+        [this] { after_change_rb_game_type(); });
+    connect(ui->rb_arithmetic, &QPushButton::clicked,
+        [this] { after_change_rb_game_type(); });
 }
 
 MainWindow::~MainWindow()
@@ -120,10 +143,10 @@ void MainWindow::timeout_waiting_keypress() {
     qint64 offs = dt_start_waiting_keyPress.msecsTo(dt);
 
     if (offs >= 20000)
-        fix_pressed_key(0);
+        fix_pressed_key(QChar(0));
 }
 
-void MainWindow::recalc_probability() {
+void MainWindow::recalc_score() {
 
     uint szQu = list_remember_queue.size();
     LevCntr& lev = map_stat_levels[szQu];
@@ -132,9 +155,9 @@ void MainWindow::recalc_probability() {
     uint e = lev.c_errors;
 
     if (!n)
-        lev.probability = 0;
+        lev.score = 0;
     else
-        lev.probability =
+        lev.score =
             bernoulli_integral_inverse(
                 n - e, n, 0.1);
 }
@@ -143,25 +166,28 @@ void MainWindow::show_stat_info() {
 
     QStringList list_info;
 
-    list_info.append("CURRENT_LEVEL: "+QString::number(list_remember_queue.size()));
-    list_info.append("");
+    list_info.append("\nCURRENT_LEVEL: "+QString::number(list_remember_queue.size()));
 
     for (auto& pr : map_stat_levels) {
         uint szQu = pr.first;
         LevCntr& m = pr.second;
 
+        if (!m.c_passed_steps)
+            continue;
+
         QString s =
-                "lev: " + QString::number(szQu)+
-                " "+QString::number(m.c_errors)+
-                "/"+QString::number(m.c_passed_steps)+
-                "/"+QString::number(m.c_skipped_steps)+
-                " reward: "+QString::number(m.probability, 'f', 4);
+                " type:" + QString::number(state_game_type)+
+                " lev:" + QString::number(szQu)+
+                " er:"+QString::number(m.c_errors)+
+                " stp:"+QString::number(m.c_passed_steps)+
+                " skip:"+QString::number(m.c_skipped_steps)+
+                " score: "+QString::number(m.score, 'f', 4);
 
         list_info.append(s);
     }
 
     QString info = list_info.join("\n");
-    file_log(path_file_log(), "\n"+info);
+    file_log(path_file_log(), info);
 
     ui->lb_info->setText(info);
 }
@@ -195,12 +221,45 @@ void MainWindow::show_new_key_after_delay() {
     show_stat_info();
 }
 
+const QString& MainWindow::current_abc() const {
+
+    if (state_game_type <= 1)
+        return abc_english();
+    else if (state_game_type <= 2)
+        return abc_russian();
+    else
+        return abc_numbers();
+}
+
+QChar MainWindow::get_current_symbol() const {
+
+    if (state_game_type <= 2)
+        return list_remember_queue.front();
+
+    uint zero = QChar('0').unicode();
+
+    uint sum = 0;
+    for (const QChar& sy: list_remember_queue)
+        sum += sy.unicode() - zero;
+
+    QString s = QString::number(sum);
+    sum = 0;
+    for (const QChar& sy: s)
+        sum += sy.unicode() - zero;
+
+    return QChar( (sum % 10) + zero );
+}
+
 void MainWindow::make_new_random_symbol() {
 
-    uint index_new_symbol = rand() % abc().size();
-    QChar sy = abc().at(index_new_symbol);
+    const QString& _abc = current_abc();
+
+    uint index_new_symbol = rand() % _abc.size();
+    QChar sy = _abc.at(index_new_symbol);
     list_remember_queue.push_back(sy);
     ++count_generated_keys;
+
+    file_log(path_file_log(), QString("NEW_RAND_SYMBOL:")+sy);
 
     dt_start_waiting_keyPress = QDateTime::currentDateTimeUtc();
 
@@ -213,7 +272,7 @@ void MainWindow::fix_pressed_key(QChar sy) {
 
     uint szQu = list_remember_queue.size();
 
-    current_symbol = list_remember_queue.front();
+    current_symbol = get_current_symbol();
 
     state_error =
         pressed_symbol != current_symbol
@@ -244,8 +303,8 @@ void MainWindow::fix_pressed_key(QChar sy) {
     if (state_error)
         ++lev.c_errors;
 
-    recalc_probability();
-    insert_step();
+    recalc_score();
+    insert_step(0);
 
     if (!state_error) {
         ++index_pressed_true_keys;
@@ -254,7 +313,10 @@ void MainWindow::fix_pressed_key(QChar sy) {
         return;
     }
 
-    count_pressed_for_skip = index_pressed_true_keys + szQu;
+    if (state_game_type <= 2)
+        count_pressed_for_skip = index_pressed_true_keys + szQu;
+    else
+        count_pressed_for_skip = index_pressed_true_keys + 1;
 
     QString msg_symbols = "";
     for (QChar sy: list_remember_queue)
@@ -280,7 +342,7 @@ void MainWindow::keyPressEvent(QKeyEvent* event) {
         return;
 
     QChar sy = s.front();
-    if (!abc().contains(sy))
+    if (!current_abc().contains(sy))
         return;
 
     fix_pressed_key(sy);
@@ -291,11 +353,15 @@ void MainWindow::clicked_bt_start_clicked()
     if (state_play)
         return;
 
+    if (ui->tabWidget->currentWidget() != ui->tab_main)
+        return;
+
     ui->bt_stop->setEnabled(true);
     ui->bt_start->setEnabled(false);
     ui->bt_increase->setEnabled(true);
     ui->bt_continue->setEnabled(false);
     ui->bt_exit->setEnabled(false);
+    ui->wg_game_type->setEnabled(false);
 
     count_generated_keys = 0;
     index_pressed_true_keys = 0;
@@ -309,10 +375,12 @@ void MainWindow::clicked_bt_start_clicked()
     map_stat_levels.clear();
 
     srand(time(NULL));
+    file_log(path_file_log(), "=== START ===");
+
     make_new_random_symbol();
 
-    file_log(path_file_log(), "=== START ===");    
     insert_start();
+    insert_step(1);
 }
 
 void MainWindow::clicked_bt_stop_clicked()
@@ -330,12 +398,15 @@ void MainWindow::clicked_bt_stop_clicked()
     ui->bt_exit->setEnabled(true);
     ui->lb_symb->setText("");
     ui->lb_symb->setStyleSheet("");
+    ui->wg_game_type->setEnabled(true);
 }
 
 void MainWindow::clicked_bt_increase_clicked()
 {
-    if (state_play && !state_error)
+    if (state_play && !state_error) {
         make_new_random_symbol();
+        insert_step(2);
+    }
 }
 
 void MainWindow::clicked_bt_continue_after_error_clicked()
@@ -349,5 +420,50 @@ void MainWindow::clicked_bt_continue_after_error_clicked()
     ui->bt_continue->setEnabled(false);
     state_error = false;
     dt_start_waiting_keyPress = QDateTime::currentDateTimeUtc();
+
+    insert_step(3);
 }
+
+void MainWindow::after_change_rb_game_type() {
+    if (state_play) return;
+
+    if (ui->rb_english->isChecked())
+        state_game_type = 1;
+
+    else if (ui->rb_russian->isChecked())
+        state_game_type = 2;
+
+    else if (ui->rb_arithmetic->isChecked())
+        state_game_type = 3;
+
+    else {
+        state_game_type = 1;
+        ui->rb_english->setChecked(true);
+    }
+
+    setQueryResults();
+}
+
+void MainWindow::change_game_type() {
+    if (state_play) return;
+
+    auto fn = [this](auto* rb1, auto* rb2) -> bool {
+        if (!rb1->isChecked()) return false;
+        rb1->setChecked(false);
+        rb2->setChecked(true);
+        after_change_rb_game_type();
+        return true;
+    };
+
+    auto* rb1 = ui->rb_english;
+    auto* rb2 = ui->rb_russian;
+    auto* rb3 = ui->rb_arithmetic;
+
+    if (!fn(rb1, rb2))
+        if (!fn(rb2, rb3))
+            if (!fn(rb3, rb1))
+                after_change_rb_game_type();
+}
+
+
 

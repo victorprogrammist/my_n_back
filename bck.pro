@@ -26,12 +26,14 @@ CONFIG += c++20
 
 SOURCES += \
         bci.cpp \
+        db_settings.cpp \
         main.cpp \
         mainwindow.cpp \
         mw_database.cpp \
         tls_files.cpp
 
 HEADERS += \
+    db_settings.h \
     mainwindow.h \
     pathAppData.h
 
