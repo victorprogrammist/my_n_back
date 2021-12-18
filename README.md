@@ -86,23 +86,23 @@ update 2021-11-14
 и после от этой суммы взять остаток от деления на 10.
 
 ```
-    uint zero = QChar('0').unicode();
-
-    uint sum = 0;
-    for (const QChar& sy: list_remember_queue)
-        sum += sy.unicode() - zero;
-
-    QString s = QString::number(sum);
-    sum = 0;
-    for (const QChar& sy: s)
-        sum += sy.unicode() - zero;
-
-    return QChar( (sum % 10) + zero );
+int sum1 = 0;
+for (int num: list_remember)
+    sum1 += num;
+   
+int sum2 = 0;
+for (; sum1; sum1 /= 10)
+    sum2 += sum1 % 10;
+    
+result = sum2 % 10;
 ```
 
 Формула существенна проста, но требует дополнительной памяти
 для вычисления, и приучает мозг не терять запомненное
 при различных обработках запомненных данных.
+
+В случае ошибки, для данного типа игры, после
+не считается для SCORE лишь один символ.
 
 ==================================================
 
